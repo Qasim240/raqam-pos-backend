@@ -2,6 +2,8 @@ const Return = require("../models/return.model");
 const Product = require("../models/product.model");
 const Sale = require("../models/sale.model");
 const ApiError = require("../utils/ApiError");
+const { postReturnJE } = require("../services/posting.service");
+const { isDateLocked } = require("../services/period.service");
 
 const formatReturn = (r) => ({
   id: r._id,
@@ -61,6 +63,9 @@ exports.create = async (req, res, next) => {
       return next(new ApiError(400, "Refund amount is required"));
     }
 
+    const lockReason = await isDateLocked(new Date());
+    if (lockReason) return next(new ApiError(400, lockReason));
+
     // Verify the sale exists
     const sale = await Sale.findById(saleId);
     if (!sale) {
@@ -100,6 +105,11 @@ exports.create = async (req, res, next) => {
         });
       }
     }
+
+    // Best-effort accounting post — never fails the return
+    postReturnJE(returnRecord).catch((err) =>
+      console.error("[posting] return JE post failed:", err.message)
+    );
 
     res.status(201).json({ success: true, data: formatReturn(returnRecord) });
   } catch (err) {

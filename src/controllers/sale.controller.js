@@ -1,6 +1,9 @@
 const Sale = require("../models/sale.model");
 const Product = require("../models/product.model");
 const ApiError = require("../utils/ApiError");
+const { postSaleJE } = require("../services/posting.service");
+const { ensureCustomerAccount } = require("../services/parties.service");
+const { isDateLocked } = require("../services/period.service");
 
 const formatSale = (s) => ({
   id: s._id,
@@ -17,6 +20,15 @@ const formatSale = (s) => ({
   cashierName: s.cashierName,
   customerPhone: s.customerPhone || "",
   customerName: s.customerName || "",
+  paymentMethods: (s.paymentMethods || []).map((p) => ({
+    method: p.method,
+    amount: p.amount,
+  })),
+  creditAmount: s.creditAmount || 0,
+  creditCustomer: s.creditCustomer || "",
+  taxAmount: s.taxAmount || 0,
+  taxMode: s.taxMode || "none",
+  taxRate: s.taxRate || 0,
 });
 
 // GET /api/sales
@@ -46,6 +58,12 @@ exports.create = async (req, res, next) => {
       cashierName,
       customerPhone,
       customerName,
+      paymentMethods,
+      creditAmount,
+      creditCustomer,
+      taxAmount,
+      taxMode,
+      taxRate,
     } = req.body;
 
     if (!items || items.length === 0) {
@@ -55,6 +73,9 @@ exports.create = async (req, res, next) => {
     if (total == null || cashReceived == null) {
       return next(new ApiError(400, "Total and cashReceived are required"));
     }
+
+    const lockReason = await isDateLocked(date || new Date());
+    if (lockReason) return next(new ApiError(400, lockReason));
 
     const sale = await Sale.create({
       date: date || new Date(),
@@ -70,6 +91,12 @@ exports.create = async (req, res, next) => {
       cashierName,
       customerPhone: customerPhone || "",
       customerName: customerName || "",
+      paymentMethods: Array.isArray(paymentMethods) ? paymentMethods : [],
+      creditAmount: creditAmount || 0,
+      creditCustomer: creditCustomer || "",
+      taxAmount: taxAmount || 0,
+      taxMode: taxMode || "none",
+      taxRate: taxRate || 0,
     });
 
     // Deduct stock for each item
@@ -78,6 +105,21 @@ exports.create = async (req, res, next) => {
         $inc: { stock: -item.quantity },
       });
     }
+
+    // Best-effort: ensure a customer account exists when a phone was captured.
+    if (sale.customerPhone) {
+      ensureCustomerAccount({
+        phone: sale.customerPhone,
+        name: sale.customerName,
+      }).catch((err) =>
+        console.error("[parties] ensureCustomerAccount failed:", err.message)
+      );
+    }
+
+    // Best-effort accounting post — never fails the sale
+    postSaleJE(sale).catch((err) =>
+      console.error("[posting] sale JE post failed:", err.message)
+    );
 
     res.status(201).json({ success: true, data: formatSale(sale) });
   } catch (err) {

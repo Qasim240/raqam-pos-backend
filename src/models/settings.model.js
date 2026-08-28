@@ -45,6 +45,16 @@ const settingsSchema = new mongoose.Schema(
     logo: {
       type: String,
     },
+    defaultCashAccountId: { type: String, default: null },
+    defaultBankAccountId: { type: String, default: null },
+    defaultSalesIncomeAccountId: { type: String, default: null },
+    defaultSalesReturnAccountId: { type: String, default: null },
+    defaultCustomerReceivableAccountId: { type: String, default: null },
+    defaultInventoryAccountId: { type: String, default: null },
+
+    // Period-lock state. Anything dated <= this is locked: no new entries
+    // can be backdated into it, no reversals or cancellations against it.
+    accountingClosedThroughDate: { type: Date, default: null },
   },
   { timestamps: true }
 );
