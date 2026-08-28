@@ -23,6 +23,15 @@ exports.get = async (req, res, next) => {
         receiptFooter: settings.receiptFooter,
         receiptFooterAr: settings.receiptFooterAr,
         logo: settings.logo,
+        defaultCashAccountId: settings.defaultCashAccountId || null,
+        defaultBankAccountId: settings.defaultBankAccountId || null,
+        defaultSalesIncomeAccountId: settings.defaultSalesIncomeAccountId || null,
+        defaultSalesReturnAccountId: settings.defaultSalesReturnAccountId || null,
+        defaultCustomerReceivableAccountId: settings.defaultCustomerReceivableAccountId || null,
+        defaultInventoryAccountId: settings.defaultInventoryAccountId || null,
+        accountingClosedThroughDate: settings.accountingClosedThroughDate
+          ? settings.accountingClosedThroughDate.toISOString()
+          : null,
       },
     });
   } catch (err) {
@@ -33,11 +42,15 @@ exports.get = async (req, res, next) => {
 // PUT /api/settings
 exports.update = async (req, res, next) => {
   try {
+    // accountingClosedThroughDate is managed exclusively by the /period endpoints
+    // (which audit-log the change). Block it from the generic settings update.
+    const { accountingClosedThroughDate: _ignored, ...safe } = req.body;
+
     let settings = await Settings.findOne();
     if (!settings) {
-      settings = await Settings.create(req.body);
+      settings = await Settings.create(safe);
     } else {
-      Object.assign(settings, req.body);
+      Object.assign(settings, safe);
       await settings.save();
     }
 
@@ -55,6 +68,15 @@ exports.update = async (req, res, next) => {
         receiptFooter: settings.receiptFooter,
         receiptFooterAr: settings.receiptFooterAr,
         logo: settings.logo,
+        defaultCashAccountId: settings.defaultCashAccountId || null,
+        defaultBankAccountId: settings.defaultBankAccountId || null,
+        defaultSalesIncomeAccountId: settings.defaultSalesIncomeAccountId || null,
+        defaultSalesReturnAccountId: settings.defaultSalesReturnAccountId || null,
+        defaultCustomerReceivableAccountId: settings.defaultCustomerReceivableAccountId || null,
+        defaultInventoryAccountId: settings.defaultInventoryAccountId || null,
+        accountingClosedThroughDate: settings.accountingClosedThroughDate
+          ? settings.accountingClosedThroughDate.toISOString()
+          : null,
       },
     });
   } catch (err) {

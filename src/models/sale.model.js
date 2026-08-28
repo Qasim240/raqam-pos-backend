@@ -94,6 +94,34 @@ const saleSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    // Multi-method payments captured at POS.
+    // Each entry = { method: 'cash'|'card'|'wallet', amount }.
+    // If the array is empty, fall back to the legacy cash-only path
+    // (entire sale.total treated as cash).
+    paymentMethods: {
+      type: [
+        {
+          method: {
+            type: String,
+            enum: ["cash", "card", "wallet"],
+            required: true,
+          },
+          amount: { type: Number, required: true, min: 0 },
+        },
+      ],
+      default: [],
+    },
+    // Amount the customer still owes after payment — posts to receivables.
+    creditAmount: { type: Number, default: 0, min: 0 },
+    creditCustomer: { type: String, default: "" },
+    // Tax book-keeping (informational; not posted as a separate JE line in v1).
+    taxAmount: { type: Number, default: 0, min: 0 },
+    taxMode: {
+      type: String,
+      enum: ["none", "inclusive", "exclusive"],
+      default: "none",
+    },
+    taxRate: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );
